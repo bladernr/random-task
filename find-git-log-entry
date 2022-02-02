@@ -1,0 +1,4 @@
+#!/bin/sh
+
+str="\"$*\""
+git log |grep -B6 -A2 "$str"

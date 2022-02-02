@@ -1,0 +1,11 @@
+#!/bin/bash
+
+sudo apt update
+sudo apt upgrade
+sudo apt install libiberty-dev python dpkg-dev libssl-dev flex bison libudev-dev libelf-dev libpci-dev dkms binutils-dev kernel-wedge
+sudo apt-get build-dep linux-image-$(uname -r)
+sudo apt install libssl-dev
+
+#build
+fakeroot debian/rules clean
+fakeroot debian/rules binary-headers binary-generic binary-perarch

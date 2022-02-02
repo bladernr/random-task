@@ -1,0 +1,23 @@
+#!/bin/bash
+
+usage(){
+    echo $0 MAAS_ENV HOSTNAME
+    exit
+}
+
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+MAAS_ENV=$1
+HOSTNAME=$2
+
+node_data=`maas $MAAS_ENV nodes read hostname=$HOSTNAME`
+
+echo $node_data
+
+echo $HOSTNAME Information:
+echo **********************
+echo FQDN: `grep -m1 fqdn $node_data`
+echo system_id: `grep -m1 system_id $node_data`
+echo ip_address: `grep -m1 ip_address $node_data`

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+[ -d "$PWD/.git" ] && BRANCH=`git status $PWD |head -1` && echo "Git Tree: $BRANCH"

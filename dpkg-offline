@@ -1,0 +1,149 @@
+#!/bin/bash
+
+set -e
+
+DEFAULT_ARCHITECTURE=$(dpkg --print-architecture)
+DEFAULT_DIRECTORY="."
+DEFAULT_RELEASE=$(lsb_release -c | cut -f 2)
+DEFAULT_SEED="server"
+
+MIRROR_URLS=${MIRROR_URLS:-http://archive.ubuntu.com/ubuntu/}
+MIRROR_COMPONENTS=${MIRROR_COMPONENTS:-main universe}
+
+function usage() {
+    local message=$1
+
+    if [ -n "$message" ]; then
+        echo "$0: $message" >&2
+    fi
+
+    cat <<EOF
+Usage: `basename $0` [OPTION]... PACKAGE
+
+Options:
+  -a ARCHITECTURE           Operate on ARCHITECTURE. The default is $DEFAULT_ARCHITECTURE.
+  -d DIRECTORY              Target DIRECTORY. The default is $DEFAULT_DIRECTORY.
+  -r RELEASE                Operate on the specified RELEASE. The default is $DEFAULT_RELEASE.
+  -s SEED                   Parent SEED like server or desktop. The default is $DEFAULT_SEED.
+  -h                        Display this help and exit
+
+Environment:
+  MIRROR_URLS               List of URLs to look for packages: $MIRROR_URLS
+  MIRROR_COMPONENTS         List of components to look for packages: $MIRROR_COMPONENTS
+EOF
+    exit 1
+}
+
+function absolute_path() {
+    local relative_path=$1
+
+    directory=$(dirname "$relative_path")
+    filename=$(basename "$relative_path")
+    echo $(cd "$directory" 2>/dev/null && pwd || echo "$directory")/$filename
+}
+
+function package_url() {
+    local name=$1
+    local release=${2:-$DEFAULT_RELEASE}
+    local architecture=${3:-$DEFAULT_ARCHITECTURE}
+
+    for url in $MIRROR_URLS; do
+        for component in $MIRROR_COMPONENTS; do
+            packages_url="$url/dists/$release/$component/binary-$architecture/Packages.bz2"
+            if echo $url | grep -q "archive.ubuntu.com"; then
+                args="--spider"
+            else
+                args="-O /dev/null"
+            fi
+            if wget -q $args $packages_url; then
+                path=$(wget -q -O - $packages_url \
+                    | bunzip2 -c - \
+                    | grep "^Filename: .*/${name}_" \
+                    | cut -d " " -f 2)
+                if [ -n "$path" ]; then
+                    echo "$url/$path"
+                    return 0
+                fi
+            fi
+        done
+    done
+
+    echo "Failed to GET '$name'" >&2
+    return 1
+}
+
+function package_get() {
+    local name=$1
+    local directory=${2:-$DEFAULT_DIRECTORY}
+    local release=${3:-$DEFAULT_RELEASE}
+    local architecture=${4:-$DEFAULT_ARCHITECTURE}
+
+    if [ ! -e "$directory" ]; then
+        mkdir -p "$directory"
+    fi
+
+    url=$(package_url $name $release $architecture)
+    output="$directory/$(basename $url)"
+    wget -q -O "$output" $url
+
+    return 0
+}
+
+ARCHITECTURE=$DEFAULT_ARCHITECTURE
+DIRECTORY=$DEFAULT_DIRECTORY
+RELEASE=$DEFAULT_RELEASE
+SEED=$DEFAULT_SEED
+
+while getopts "a:d:r:s:h" OPTION; do
+    case ${OPTION} in
+        a) ARCHITECTURE=$OPTARG;;
+        d) DIRECTORY=$OPTARG;;
+        r) RELEASE=$OPTARG;;
+        s) SEED=$OPTARG;;
+        h|?) usage;;
+        *)
+            usage "invalid option";;
+    esac
+done
+shift $((${OPTIND} - 1))
+
+if [ $# -ne 1 ]; then
+    usage "must specify a single PACKAGE"
+fi
+
+PACKAGE=$1; shift
+
+if [ ! -e "$DIRECTORY" ]; then
+    mkdir -p $DIRECTORY
+fi
+DIRECTORY=$(absolute_path $DIRECTORY)
+
+GERMINATE_DIR="$DIRECTORY/germinate"
+if [ ! -e "$GERMINATE_DIR" ]; then
+    echo "Branching germinate..."
+    bzr branch lp:germinate $GERMINATE_DIR
+fi
+
+echo "Calculating package dependencies..."
+GERMINATE_BIN="$GERMINATE_DIR/bin/germinate"
+(cd $DIRECTORY ; PYTHONPATH=$GERMINATE_DIR $GERMINATE_BIN \
+    -s ubuntu.$RELEASE \
+    $(for url in $MIRROR_URLS; do echo "-m $url"; done) \
+    -d $RELEASE \
+    -a $ARCHITECTURE \
+    -c $(echo $MIRROR_COMPONENTS | sed 's/ /,/g') \
+    --seed-packages $SEED/$PACKAGE) >/dev/null
+
+echo "Getting package dependencies..."
+PACKAGE_FILE="$DIRECTORY/$PACKAGE"
+for name in `awk 'BEGIN{do_print=0}; !/---/ {if (do_print) print $1 } /---/ {do_print=!do_print}' $PACKAGE_FILE`; do
+    package_get $name $DIRECTORY $RELEASE $ARCHITECTURE
+done
+
+echo "Creating archive of packages..."
+PACKAGE_ARCHIVE="${PACKAGE_FILE}.tar.gz"
+(cd $DIRECTORY ; tar -czf "$PACKAGE_ARCHIVE" *.deb)
+cat <<EOF
+Successfully created archive:
+$PACKAGE_ARCHIVE
+EOF

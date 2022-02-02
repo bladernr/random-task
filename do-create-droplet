@@ -1,0 +1,105 @@
+#!/bin/bash
+set -e
+ 
+SECRETFILE=~/.digitalocean
+if [[ -z $DO_ID ]] || [[ -z $DO_TOKEN ]]; then
+    if [ -e $SECRETFILE ]; then
+        . $SECRETFILE
+    fi
+fi
+echo "GETTING ID AND TOKEN"
+if [[ -z $DO_ID ]] || [[ -z $DO_TOKEN ]]; then
+    echo "You need to set the environment variables DO_ID and DO_TOKEN"
+    echo "or provide them in the file $SECRETFILE"
+    exit 1
+fi
+ 
+# DEFAULTS
+BASE_URL='https://api.digitalocean.com/v2'
+AUTH_HEADER="Authorization: Bearer $DO_TOKEN"
+REGION_NAME="New York 2"
+#SIZE_NAME="2gb"
+SIZE_NAME="16gb"
+IMAGE_NAME="14.04 x64"
+SSH_KEY="DO Keys"
+
+if [ "$1" == "precise" ]; then
+    IMAGE_NAME="12.04.5 x64"
+fi
+
+echo "=============================="
+echo "=   Droplet Configuration    ="
+echo "=============================="
+REGION_ID=`curl -s "$BASE_URL/regions" -H "$AUTH_HEADER" | jq ".regions | map(select(.name==\"$REGION_NAME\"))[0].slug"`
+echo "ID of Region $REGION_NAME is $REGION_ID"
+
+#SIZE_ID=`curl -s "$BASE_URL/sizes" -H "$AUTH_HEADER" | jq ".sizes | map(select(.name==\"$SIZE_NAME\"))[0].sizes"`
+SIZE_ID=$SIZE_NAME
+echo "ID of Size $SIZE_NAME is $SIZE_ID"
+
+for page in `seq 1 2`; do
+    IMAGE_ID=`curl -s "$BASE_URL/images?filter=global&page=$page" -H "$AUTH_HEADER" | jq ".images | map(select(.name==\"$IMAGE_NAME\"))[0].id"`
+    if [ "$IMAGE_ID" != "Null" ] && [ "$IMAGE_ID" != "null" ]; then
+        echo "ID of Image $IMAGE_NAME is $IMAGE_ID"
+        break
+    fi
+done
+if [ "$IMAGE_ID" == "Null" ] || [ "$IMAGE_ID" == "null" ]; then
+    echo "ERROR: Image ID Not Found for Image Name $IMAGE_NAME"
+    exit 1
+fi
+
+SSH_KEY_ID=`curl -s "$BASE_URL/account/keys" -H "$AUTH_HEADER" | jq ".ssh_keys | map(select(.name==\"$SSH_KEY\"))[0].id"`
+echo "Activating SSH Key with ID $SSH_KEY_ID"
+echo "=============================="
+TIMESTAMP=`date '+%Y%m%d%H%M%S'`
+DROPLET_NAME="droplet-$TIMESTAMP"
+echo
+echo "Creating new Droplet $DROPLET_NAME ..."
+RESULT=`curl -X POST "$BASE_URL/droplets" -d"{\"name\":\"$DROPLET_NAME\",\"region\":$REGION_ID,\"size\":\"$SIZE_ID\",\"image\":$IMAGE_ID, \"ssh_keys\":[\"$SSH_KEY_ID\"]}" -H "$AUTH_HEADER" -H "Content-Type: application/json" 2> /dev/null`
+
+STATUS=`echo $RESULT | jq -r '.droplet.status'`
+if [ "$STATUS" == "Null" ]; then
+    echo "Something went wrong:"
+    echo $RESULT | jq .
+    exit 1
+fi
+
+DROPLET_ID=`echo $RESULT | jq '.droplet.id'`
+echo "Droplet with ID $DROPLET_ID created!"
+ 
+echo "Waiting for droplet to boot"
+for i in {1..60}; do
+    DROPLET_STATUS=`curl -X GET "$BASE_URL/droplets/$DROPLET_ID/" -H "$AUTH_HEADER" 2> /dev/null | jq -r '.droplet.status'`
+    [ "$DROPLET_STATUS" == 'active' ] && break
+    echo -n '.'
+    sleep 5
+done
+echo
+ 
+if [ "$DROPLET_STATUS" != 'active' ]; then
+    echo "Droplet did not boot in time. Status: $DROPLET_STATUS"
+    exit 1
+fi
+ 
+IP_ADDRESS=`curl -X GET "$BASE_URL/droplets/$DROPLET_ID" -H "$AUTH_HEADER" 2> /dev/null | jq -r '.droplet.networks.v4'[0].ip_address`
+ 
+#echo "Execute bootstrap script"
+#BOOTSTRAP_URL="https://gist.github.com/christianberg/6082234/raw/bootstrap.sh"
+#ssh-keygen -R $IP_ADDRESS
+#SSH_OPTIONS="-o StrictHostKeyChecking=no"
+#ssh $SSH_OPTIONS root@$IP_ADDRESS "curl -s $BOOTSTRAP_URL | bash"
+ 
+echo "=============================="
+echo "  Droplet is ready to use!"
+echo "  IP address: $IP_ADDRESS"   
+echo "=============================="
+echo
+echo "Would you like to connect to the droplet? (Y/n)"
+read action
+
+if [ "$action" == "Y" ] || [ "$action" == "y" ] || [ "$action" == "" ]; then
+    echo "Connecting to droplet $DROPLET_NAME"
+    ssh $IP_ADDRESS
+fi
+

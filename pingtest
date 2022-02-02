@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+
+import pingparsing # from Pypi
+import argparse
+import sys
+
+def parse_opts():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--destination', default='8.8.8.8',
+                        help='Ping Target')
+    parser.add_argument('-w', '--waittime', default=None, 
+                        help='Stops ping after WAITTIME seconds regardless of'
+                        'how many packets have been transmitted')
+    parser.add_argument('-c', '--count', default=10,
+                        help='Number of pacets to transmit')
+    
+    return parser.parse_args()
+
+def main():
+    options = parse_opts()
+
+    ping_parser = pingparsing.PingParsing()
+    transmitter = pingparsing.PingTransmitter()
+    transmitter.destination_host = options.destination
+    transmitter.count=options.count
+    if options.waittime:
+        transmitter.waittime = options.waittime
+
+    result = transmitter.ping()
+
+    ping_parser.parse(result.stdout)
+
+    if ping_parser.packet_loss > 0:
+        print("Ping test Failed:")
+        print("  Packet Loss: {}%".format(ping_parser.packet_loss))
+        print("  {} of {} packets recieved".format(ping_parser.packet_receive,
+                                                   ping_parser.packet_transmit))
+        return 1
+
+    return 0
+
+if __name__ == main():
+    sys.exit(main())
+
+
+

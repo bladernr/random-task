@@ -1,0 +1,32 @@
+#!/bin/bash
+
+usage() {
+    echo $0 TARGET
+    echo
+    echo where TARGET is the HOSTNAME or IP to poll
+    exit 1
+}
+
+wait_for_ssh() {
+    loopcnt=0
+    maxloop=60
+    echo "Testing to see if system is back up"
+    until timeout 10 ssh ubuntu@$TARGET /bin/true
+    do
+        loopcnt=$((loopcnt+1))
+        echo "Attempt $loopcnt of $maxloop"
+        if [ $loopcnt -gt $maxloop ]; then
+            echo "ERROR: Timeout waiting for ssh!"
+            exit 1
+        fi
+        sleep 30
+    done
+    echo "System appears to be back up"
+}
+
+
+if [ "$#" -ne "1" ]; then
+    usage
+fi
+TARGET=$1
+wait_for_ssh

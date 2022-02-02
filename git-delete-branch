@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# make sure we're in master
+if ! git status |grep -q "On branch master"; then
+    echo "We're not in Master, moving..."
+    git checkout master
+    echo ""
+fi
+
+# delete the requested branch remotely first then locally
+if ! git push bladernr :$1; then
+    echo "Unable to delete remote branch $1, exiting"
+    exit
+else
+    if ! git branch -d $1; then
+        echo "Unable to delete local branch $1, exiting"
+        exit
+    fi
+fi

@@ -1,0 +1,27 @@
+#!/bin/bash
+set -e
+ 
+SECRETFILE=~/.digitalocean
+if [[ -z $DO_ID ]] || [[ -z $DO_TOKEN ]]; then
+    if [ -e $SECRETFILE ]; then
+        . $SECRETFILE
+    fi
+fi
+echo "GETTING ID AND TOKEN"
+if [[ -z $DO_ID ]] || [[ -z $DO_TOKEN ]]; then
+    echo "You need to set the environment variables DO_ID and DO_TOKEN"
+    echo "or provide them in the file $SECRETFILE"
+    exit 1
+fi
+ 
+BASE_URL='https://api.digitalocean.com/v2'
+AUTH_HEADER="Authorization: Bearer $DO_TOKEN"
+
+echo "Getting list of droplets active"
+ACTIVE_DROPLETS=`curl -X GET "$BASE_URL/droplets" -H "$AUTH_HEADER" 2>/dev/null | jq '.droplets'[].id`
+
+echo "Found the following droplet IDs:"
+for droplet in $ACTIVE_DROPLETS; do
+    DROPLET_IP=`curl -X GET "$BASE_URL/droplets/$droplet" -H "$AUTH_HEADER" 2>/dev/null | jq '.droplet.networks.v4'[0].ip_address`
+    echo "  $droplet:  $DROPLET_IP"
+done

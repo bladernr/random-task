@@ -1,0 +1,70 @@
+#!/bin/bash
+
+usage () {
+    echo
+    echo "$0 <COMMIT or FILE>"
+    echo
+    cat <<EOF
+    This will guess if a commit is in a given Ubuntu kernel or not
+    by passing the script either a file with a list of COMMIT IDs ONLY
+    with one commit per line, OR passing it a single commit ID.
+    This will give you the first kernel that a given commit appeared
+    and thus the kernel returned may be far earlier than you are
+    expecting, especially in the case of mainline where the first
+    kernel version may be an interim staging version.
+
+    This is meant to be run against Ubuntu kernel trees only, though
+    it will attempt to guess an upstream kernel IF you have added a mainline
+    kernel tree as a remote:
+
+      git remote add <NAME> <URL>
+
+    It cannot tell you which remote provided the tag, so if you have multiple
+    remotes as I sometimes do (mainline, torvalds, scsi-staging, linux-next)
+    the tag could come from any one of them but it will at least get you a
+    starting point for further searching.
+
+    When passing a file to the script, the file MUST BE in the format of a list
+    of commit IDs only, no summary or other data, one commit per line.
+EOF
+}
+
+if [ "$#" -ne "1" ]; then
+    usage
+    exit 1
+fi
+
+get_data () {
+    # Sometimes the commit we're looking for is already pulled in via a
+    # different commit, this (hopefully) finds that new commit.
+    realcommit=$(git log --oneline --grep=$1|awk '{print $1}')
+    kernel=$(git describe --match "Ubuntu*" --contains $1 2>/dev/null)
+    if [ ! -z "$realcommit" ]; then
+        kernel=$(git describe --contains $realcommit)
+        echo "$1 is provided by $realcommit in Ubuntu starting at $kernel"
+    elif [ ! -z "$kernel" ]; then
+        echo "$1 exists in Ubuntu starting at $kernel"
+    else
+        # Anything that hits this is not in Ubuntu, BUT if you have also set up
+        # a mainline remote and fetched it's refs, it will attempt to tell you
+        # where in mainline it first appeared as well.
+        kernel=$(git describe --contains $1 2>&1)
+        if [[ "$kernel" =~ .*"Could not get".* ]]; then
+            kernel="NOT FOUND"
+        else
+            kernel="$kernel merged on $(git log $1 |head -3 |grep Date|cut -f 1 -d ' ' --complement|sed -e 's/^[ \t]*//')"
+        fi
+        echo "$1 does not appear in Ubuntu. Best guess on first appearance upstream: $kernel"
+    fi
+}
+
+if [ -f $1 ]; then
+    for commit in `cat $1|awk '{print $1}'`; do
+        get_data $commit
+    done
+else
+    commit=$1
+    get_data $commit
+fi
+
+

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+byobu new-window -n "$1"
+# byobu send-keys "COMMAND" C-m

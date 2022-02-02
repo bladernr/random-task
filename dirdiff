@@ -1,0 +1,5 @@
+
+find $1 | sed 's,^[^/]*/,,' | sort > dir1.txt
+find $2 | sed 's,^[^/]*/,,' | sort > dir2.txt
+
+diff dir1.txt dir2.txt

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Make sure we're in the TLD
+if [ ! -d "debian" ]; then
+    echo "Must be in the top level Directory of the tree you wish to tar"
+    exit 1
+fi
+
+# Get our package data
+PACKAGEDATA=`head -1 debian/changelog`
+PACKAGENAME=`echo "$PACKAGEDATA" | awk '{print $1}'`
+PACKAGEVER=`echo "$PACKAGEDATA" | awk '{gsub(/[\(\)]/,"",$2);print $2}'` 
+
+# Tar that sucker up~
+tar cvfz ../${PACKAGENAME}_${PACKAGEVER}.orig.tar.gz --exclude debian/ .

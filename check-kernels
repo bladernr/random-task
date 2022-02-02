@@ -1,0 +1,94 @@
+#!/bin/bash
+
+usage () {
+    echo "Usage: "
+    echo "$0 -c <codename> -e"
+    echo 
+    echo "Optional:"
+    echo "-c <codename> is an Ubuntu series (e.g. bionic, focal)"
+    echo "   default is to dump all supported releases"
+    echo "-e will include edge kernel information"
+    exit
+}
+
+while getopts "c:" flag
+do
+    case ${flag} in
+        c) codename=${OPTARG};;
+        \?) usage;;
+    esac
+done
+
+OLDFILE=$HOME/.lastkernelcheck
+NEWFILE=$HOME/.newkernelcheck
+
+releases=`ubuntu-distro-info --supported`
+if [ ! -z $codename ]; then
+    releases="$codename"
+fi
+
+arches="amd64,arm64,ppc64el,s390x"
+
+echo "Checking kernels..."
+for codename in $releases; do
+    # get the numeric version
+    release=`ubuntu-distro-info --series $codename -r |awk '{print $1}'`
+    kernels="linux-image-generic linux-image-generic-hwe-$release linux-image-generic-hwe-$release-edge"
+    echo "$codename $release:" >> $NEWFILE
+    rmadison --arch $arches -s $codename,${codename}-updates,${codename}-proposed $kernels >> $NEWFILE
+    echo >> $NEWFILE
+done
+
+echo "New changes since last check: )"
+[ -e $OLDFILE ] && diff -bu --label "Old Data" --label "New Data" $OLDFILE $NEWFILE || echo "No previous data to compare"
+
+read -r -p "Would you like to see the kernel list? (y/n)" yn
+if [ "$yn" == "y" ]; then
+    cat $NEWFILE
+fi 
+
+echo
+echo "Updating $OLDFILE with new data"
+mv $NEWFILE $OLDFILE
+
+
+#edge
+#GA="rmadison linux-image-generic"
+#HWE="rmadison linux-image-generic-hwe-$1"
+#EDGE="rmadison linux-image-generic-hwe-$1-edge"
+#if [ "$pocket_arg" == "all" ]; then
+#    pockets="updates proposed"
+#elif [ -z $pocket_arg ]; then
+#    pockets="updates"
+#else
+#    pockets=$pocket_arg
+#fi
+
+#for pocket in `echo $pockets`; do 
+#    rmadison linux-image-generic | grep $pocket
+#    rmadison linux-image-generic-hwe-$release | grep $pocket
+#    rmadison linux-image-generic-hwe-$release-edge | grep $pocket
+#
+#
+#echo GA ${pocket^}:
+#rmadison linux-image-generic | grep $pocket
+#echo
+
+#echo HWE ${pocket^}:
+#if [ -z $release ]; then
+#    for release in 18.04 20.04; do
+#        rmadison linux-image-generic-hwe-$release | grep $pocket
+#    done
+#else
+#    rmadison linux-image-generic-hwe-$release | grep $pocket
+#fi
+#echo
+
+#echo Edge ${pocket^}:
+#if [ -z $release ]; then
+#    for release in 18.04 20.04; do
+#        rmadison linux-image-generic-hwe-$release-edge | grep $pocket
+#    done
+#else
+#    rmadison linux-image-generic-hwe-$release-edge | grep $pocket
+#fi

@@ -1,3 +1,5 @@
+#!/bin/bash
+# Stupid script I wrote just to help find duplicate files in two directories.
 
 find $1 | sed 's,^[^/]*/,,' | sort > dir1.txt
 find $2 | sed 's,^[^/]*/,,' | sort > dir2.txt

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Helper script to create a local clone of a new ubuntu kernel tree and
+# pre-populate common remotes
 
 RELEASE=$1
 DEVDIR=~/development/kernels

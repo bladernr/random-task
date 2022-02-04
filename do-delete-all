@@ -1,5 +1,9 @@
 #!/bin/bash
 set -e
+
+# cleanup script to delete all active droplets on Digital Ocean
+# I only use DO for prototyping occasionally, so it's safe for me to just kill
+# them all wtih fire.
  
 SECRETFILE=~/.digitalocean
 if [[ -z $DO_ID ]] || [[ -z $DO_TOKEN ]]; then

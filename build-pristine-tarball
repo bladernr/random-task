@@ -1,4 +1,5 @@
 #!/bin/bash
+# Shortcut script to build a pristine tarball for PPA uploads
 
 # Make sure we're in the TLD
 if [ ! -d "debian" ]; then

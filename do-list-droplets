@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+
+# List running Digital Ocean droplets
  
 SECRETFILE=~/.digitalocean
 if [[ -z $DO_ID ]] || [[ -z $DO_TOKEN ]]; then

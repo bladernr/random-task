@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# Short script to check battery or mains status using APC tools
+# for ACP UPSs
+
 status=`apcaccess -p STATUS`
 
 if [[ "$status" == "ONBATT" ]]; then

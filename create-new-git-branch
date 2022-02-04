@@ -1,10 +1,12 @@
 #!/bin/bash
 
-## create a new git branch on the latest Master using specified or requested
-#branch name.
+# create a new git branch on the latest Master using specified or requested
+# branch name. Farily stupid script, but I'm sometimes too lazy to update
+# the default branch before doing so.  This could probably become an alias
+# in .gitconfig
 
-# make sure we're in master
-git checkout master
+# make sure we're in the default
+git checkout master || git checkout main
 
 if [[ $? -ne 0 ]]; then
     echo "ERROR: This may not be a git branch..."

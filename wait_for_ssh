@@ -1,9 +1,12 @@
 #!/bin/bash
+# Useful for waiting on a deployment to complete, or a reboot.
+# Will check and then SSH to target once it's live
 
 usage() {
     echo $0 TARGET
     echo
     echo where TARGET is the HOSTNAME or IP to poll
+    echo TARGET can be any valid SSH target
     exit 1
 }
 
@@ -11,7 +14,7 @@ wait_for_ssh() {
     loopcnt=0
     maxloop=60
     echo "Testing to see if system is back up"
-    until timeout 10 ssh ubuntu@$TARGET /bin/true
+    until timeout 10 ssh $TARGET /bin/true
     do
         loopcnt=$((loopcnt+1))
         echo "Attempt $loopcnt of $maxloop"
@@ -30,3 +33,4 @@ if [ "$#" -ne "1" ]; then
 fi
 TARGET=$1
 wait_for_ssh
+ssh $TARGET

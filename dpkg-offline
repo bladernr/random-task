@@ -1,4 +1,5 @@
 #!/bin/bash
+# Script for building a local dpkg deb  repository
 
 set -e
 

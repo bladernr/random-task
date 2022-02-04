@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Command line stock checker
 set -e
 
 LANG=C

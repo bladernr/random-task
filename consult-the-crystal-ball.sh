@@ -1,4 +1,6 @@
 #!/bin/bash
+# Quick and dirty script to run the phb-crystal-ball against mainline and
+# upload it to a web target.
 
 PHBDIR=/home/bladernr/development/phb-crystal-ball/
 PHB_WEB_DIR=$PHBDIR/www

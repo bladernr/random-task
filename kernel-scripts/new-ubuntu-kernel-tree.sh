@@ -16,7 +16,6 @@ git clone https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/$RE
 echo "... setting up remotes"
 cd $DEVDIR/ubuntu/$RELEASE
 git remote add mainline $DEVDIR/upstream/mainline
-git remote add linux-next $DEVDIR/upstream/next
 git remote add bladernr lpme:/ubuntu/+source/linux/+git/$RELEASE
 
 echo "... review the remotes for accuracy"

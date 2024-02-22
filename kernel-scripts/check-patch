@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 usage () {
     echo
     echo "$0 <COMMIT or FILE>"
@@ -34,45 +35,69 @@ if [ "$#" -ne "1" ]; then
     exit 1
 fi
 
-get_data () {
-    # Sometimes the commit we're looking for is already pulled in via a
-    # different commit, this (hopefully) finds that new commit.
-    echo "fetching data for $1"
-    # Does commit exist in the logs?
-    echo "Checking to see if it even exists"
-    logcommit=$(git log --oneline --ignore-missing $1|head -1)
-    if [ ! -z "$logcommit" ]; then
-        echo "$1 exists in logs!"
-        kernel=$(git describe --match "Ubuntu-[0-9]*" --contains $logcommit 2>/dev/null)
-        echo "$1 exists in Ubuntu starting at $kernel"
-    elif [ -z "$logcommit" ]; then
-        echo "checking for a realcommit"
-        realcommit=$(git log --oneline --grep=$1|awk '{print $1}')
-        echo "    realcommit=$realcommit"
-        kernel=$(git describe --contains $realcommit)
-        echo "$1 is provided by $realcommit in Ubuntu starting at $kernel"
-    else
-        # Anything that hits this is not in Ubuntu, BUT if you have also set up
-        # a mainline remote and fetched it's refs, it will attempt to tell you
-        # where in mainline it first appeared as well.
-        #kernel=$(git tag --contains $1 'v*'|head -1 || git describe --contains $1)
-        kernel=$(git tag --contains $1 'v*' |head -1|| git describe --contains $1 2>&1)
-        if [[ "$kernel" =~ .*"Could not get".* ]]; then
-            kernel="NOT FOUND"
+print_result() {
+    echo "$1" |tee -a patch-check.log
+}
+
+check_ubuntu() {
+    commit=$(echo "$1" |awk '{print $1}')
+    commit_summary=$(git log --oneline --ignore-missing "$commit" 2>/dev/null|head -1)    
+    if [ ! -z "$commit_summary" ]; then
+        kernel=$(git describe --match "Ubuntu-[0-9]*" --contains "$commit" 2>/dev/null)
+        if [ -z "$kernel" ]; then    
+            # Sometimes the commit we're looking for is already pulled in via a
+            # different commit, this (hopefully) finds that new commit.
+            # Does commit exist in the logs?
+            kernel=$(git describe --contains "$commit" 2>/dev/null)
+            if [ -z "$kernel" ]; then
+                return 1
+            else
+                print_result "$commit missing in Ubuntu, found upstream at $kernel"
+                return 0
+            fi
         else
-            kernel="$kernel merged on $(git log $1 |head -3 |grep Date|cut -f 1 -d ' ' --complement|sed -e 's/^[ \t]*//')"
+            print_result "$commit exists in Ubuntu starting at $kernel"
+            return 0
         fi
-        echo "$1 does not appear in Ubuntu. Best guess on first appearance upstream: $kernel" |tee -a ./check-patch-output
     fi
+    # Not found in Ubuntu, return false so we can check upstream.
+    return 1
+}
+
+
+check_upstream () {
+    commit="$1"
+    #if [ -z "$commit" ]; then
+        realcommit=$(git log --oneline --grep="$commit"|awk '{print $1}')
+        if [ ! -z "$realcommit" ]; then
+            kernel=$(git describe --contains "$realcommit")
+            print_result "$commit is provided by $realcommit in Ubuntu starting at $kernel"
+        else
+            # Anything that hits this is not in Ubuntu, BUT if you have also set up
+            # a mainline remote and fetched it's refs, it will attempt to tell you
+            # where in mainline it first appeared as well.
+            #kernel=$(git tag --contains $1 'v*'|head -1 || git describe --contains $1)
+            kernel=$(git tag --contains "$commit" 'v*' 2>&1 |head -1|| git describe --contains "$commit" 2>&1)
+            shopt -s nocasematch
+            if [[ "$kernel" =~ .*"Could not get".* ]] || [[ "$kernel" =~ .*"error: malformed object".* ]]; then
+                print_result "$commit does not appear in either ubuntu or the upstream kernel."
+            else 
+                #kernel="$kernel merged on $(git log "$commit" |head -3 |grep Date|cut -f 1 -d ' ' --complement|sed -e 's/^[ \t]*//')"
+                print_result "$commit missing in Ubuntu. Best guess on first appearance upstream: $kernel"
+            fi
+            shopt -u nocasematch
+        fi
+    #fi
 }
 
 if [ -f $1 ]; then
-    for commit in `cat $1|awk '{print $1}'`; do
-        get_data $commit
+    for commit in $(cat $1|awk '{print $1}'); do
+        if ! check_ubuntu "$commit"; then
+            check_upstream "$commit"
+        fi
     done
 else
-    commit=$1
-    get_data $commit
+    if ! check_ubuntu "$1"; then
+        check_upstream "$1"
+    fi
 fi
-
-

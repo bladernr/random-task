@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Launchpad Bug Opener",
+  "version": "1.0",
+  "description": "Open Launchpad bug pages directly from Chrome",
+  "permissions": [
+    "tabs"
+  ],
+  "icons": {
+    "16": "Launchpad_icon_16px.png",
+    "48": "Launchpad_icon_48px.png",
+    "128": "Launchpad_icon_128px.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "omnibox": {
+    "keyword": "lp",
+    "suggestions": {
+      "suggestionUrl": "https://bugs.launchpad.net/bugs/+search?field.searchtext={searchTerms}"
+    }
+  }
+}
+
